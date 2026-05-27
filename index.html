@@ -846,10 +846,13 @@ main {
   <div class="camera-modal" id="camera-modal">
     <div class="camera-box">
       <h3 class="camera-title">Posicione seu rosto na guia</h3>
+      <select id="camera-device-select" style="width: 100%; padding: 10px; margin-bottom: 12px; background: var(--ivory); border: 1px solid var(--line); border-radius: 2px; font-family: 'Manrope', sans-serif; font-size: 13px; color: var(--charcoal); display: none;">
+      </select>
       <div class="camera-video-wrapper" id="camera-wrap">
         <video id="camera-video" autoplay playsinline muted></video>
         <div class="camera-guide"></div>
       </div>
+      <div id="camera-error" style="display: none; margin-top: 12px; padding: 12px; background: var(--cream); border-left: 3px solid var(--rose-deep); color: var(--charcoal); font-size: 13px; line-height: 1.5; border-radius: 2px;"></div>
       <div class="camera-controls">
         <button class="upload-btn secondary" id="btn-cancel-camera">Cancelar</button>
         <button class="upload-btn" id="btn-capture">Capturar foto</button>
@@ -983,7 +986,7 @@ main {
               <option value="worker">Cloudflare Worker · Replicate (pago)</option>
             </select>
             <label id="endpoint-label">Space ID (formato: usuario/nome-do-space)</label>
-            <input type="text" id="endpoint-url" placeholder="rmayormartins/atelier-estetico-backend" value="">
+            <input type="text" id="endpoint-url" placeholder="rmayormartins/aiesthetic" value="">
           </div>
         </div>
       </div>
@@ -1125,23 +1128,124 @@ function loadImageFromDataURL(dataURL) {
 // ===== CAMERA =====
 const cameraModal = document.getElementById('camera-modal');
 const cameraVideo = document.getElementById('camera-video');
+const cameraDeviceSelect = document.getElementById('camera-device-select');
+const cameraError = document.getElementById('camera-error');
 let mediaStream = null;
 
 document.getElementById('btn-open-camera').addEventListener('click', openCamera);
 document.getElementById('btn-cancel-camera').addEventListener('click', closeCamera);
 document.getElementById('btn-capture').addEventListener('click', captureFromCamera);
+cameraDeviceSelect.addEventListener('change', startCameraStream);
+
+function showCameraError(err) {
+  let msg = '';
+  console.error('Camera error:', err);
+  switch (err.name) {
+    case 'NotAllowedError':
+    case 'PermissionDeniedError':
+      msg = 'Permissão de câmera negada. Autorize nas configurações do navegador (ícone de cadeado na barra de endereço) e recarregue a página.';
+      break;
+    case 'NotFoundError':
+    case 'DevicesNotFoundError':
+      msg = 'Nenhuma câmera encontrada neste dispositivo.';
+      break;
+    case 'NotReadableError':
+    case 'TrackStartError':
+      msg = 'Câmera em uso por outro programa (OBS, Zoom, Teams, Discord etc). Feche-o e tente novamente.';
+      break;
+    case 'OverconstrainedError':
+      msg = 'Câmera selecionada não suporta a configuração pedida. Escolha outra câmera no seletor.';
+      break;
+    case 'AbortError':
+      msg = 'Acesso à câmera foi interrompido. Tente novamente.';
+      break;
+    default:
+      msg = 'Erro ao acessar câmera: ' + (err.message || err.name || 'desconhecido');
+  }
+  cameraError.textContent = msg;
+  cameraError.style.display = 'block';
+}
+
+function hideCameraError() {
+  cameraError.style.display = 'none';
+  cameraError.textContent = '';
+}
+
+async function listCameraDevices() {
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(d => d.kind === 'videoinput');
+
+    if (cameras.length === 0) return [];
+
+    cameraDeviceSelect.innerHTML = '';
+    cameras.forEach((cam, i) => {
+      const opt = document.createElement('option');
+      opt.value = cam.deviceId;
+      // Etiqueta amigável
+      let label = cam.label || `Câmera ${i + 1}`;
+      if (/obs|virtual|snap/i.test(label)) label = '⚠️ ' + label + ' (virtual)';
+      opt.textContent = label;
+      cameraDeviceSelect.appendChild(opt);
+    });
+
+    // Selecionar a primeira câmera REAL (não virtual) por padrão
+    const realCamera = cameras.find(c => c.label && !/obs|virtual|snap/i.test(c.label));
+    if (realCamera) cameraDeviceSelect.value = realCamera.deviceId;
+
+    // Mostrar dropdown só se houver mais de uma câmera
+    cameraDeviceSelect.style.display = cameras.length > 1 ? 'block' : 'none';
+
+    return cameras;
+  } catch (err) {
+    console.error('Error listing cameras:', err);
+    return [];
+  }
+}
+
+async function startCameraStream() {
+  hideCameraError();
+
+  // Parar stream anterior
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+
+  const deviceId = cameraDeviceSelect.value;
+  const constraints = {
+    video: deviceId
+      ? { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 960 } }
+      : { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
+    audio: false
+  };
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+    cameraVideo.srcObject = mediaStream;
+    await cameraVideo.play();
+  } catch (err) {
+    showCameraError(err);
+  }
+}
 
 async function openCamera() {
+  hideCameraError();
+  cameraModal.classList.add('active');
+
   try {
-    mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 960 } },
-      audio: false
-    });
-    cameraVideo.srcObject = mediaStream;
-    cameraModal.classList.add('active');
+    // 1. Pedir permissão inicial (qualquer câmera)
+    const tmpStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    tmpStream.getTracks().forEach(t => t.stop());
+
+    // 2. Agora podemos listar com labels
+    await listCameraDevices();
+
+    // 3. Iniciar stream com câmera selecionada
+    await startCameraStream();
+
   } catch (err) {
-    alert('Não foi possível acessar a câmera. Verifique permissões. Requer HTTPS ou localhost.');
-    console.error(err);
+    showCameraError(err);
   }
 }
 
@@ -1151,14 +1255,19 @@ function closeCamera() {
     mediaStream = null;
   }
   cameraModal.classList.remove('active');
+  hideCameraError();
 }
 
 function captureFromCamera() {
+  if (!cameraVideo.videoWidth) {
+    showCameraError({ name: 'AbortError', message: 'Stream não está ativo. Aguarde a câmera carregar.' });
+    return;
+  }
   const tempCanvas = document.createElement('canvas');
   tempCanvas.width = cameraVideo.videoWidth;
   tempCanvas.height = cameraVideo.videoHeight;
   const tctx = tempCanvas.getContext('2d');
-  // Un-mirror when capturing
+  // Desespelhar a captura (vídeo é espelhado via CSS)
   tctx.translate(tempCanvas.width, 0);
   tctx.scale(-1, 1);
   tctx.drawImage(cameraVideo, 0, 0);

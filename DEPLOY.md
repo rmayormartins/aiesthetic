@@ -35,7 +35,7 @@ git init
 git add .
 git commit -m "feat: atelier estético inicial"
 git branch -M main
-git remote add origin https://github.com/rmayormartins/atelier-estetico.git
+git remote add origin https://github.com/rmayormartins/aiesthetic.git
 git push -u origin main
 ```
 
@@ -56,7 +56,7 @@ Funciona de cara: upload, câmera, MediaPipe, todos os ajustes cutâneos, análi
 1. Login em [huggingface.co](https://huggingface.co)
 2. Botão de perfil → New Space
 3. Owner: seu usuário
-4. Space name: `atelier-estetico-backend`
+4. Space name: `aiesthetic`
 5. License: `mit`
 6. SDK: `Gradio`
 7. Hardware: **ZeroGPU** (gratuito, dynamic GPU)
@@ -71,8 +71,8 @@ Cada Space é um repositório Git. Clone o seu Space localmente:
 
 ```bash
 # Clone o repo do Space (vazio)
-git clone https://huggingface.co/spaces/rmayormartins/atelier-estetico-backend
-cd atelier-estetico-backend
+git clone https://huggingface.co/spaces/rmayormartins/aiesthetic
+cd aiesthetic
 
 # Copiar arquivos da pasta space/ deste projeto pra raiz do Space
 cp /caminho/para/atelier-estetico/space/app.py .
@@ -89,7 +89,7 @@ git push
 
 O Space começa a construir automaticamente. Primeira build demora 5-10 minutos (baixa o modelo SDXL, ~6.5GB).
 
-Acompanha em `https://huggingface.co/spaces/rmayormartins/atelier-estetico-backend` na aba "Logs".
+Acompanha em `https://huggingface.co/spaces/rmayormartins/aiesthetic` na aba "Logs".
 
 Quando aparecer "Running on local URL: ..." está pronto.
 
@@ -97,7 +97,7 @@ Quando aparecer "Running on local URL: ..." está pronto.
 
 Abre o app no GitHub Pages, carrega foto, vai em "Procedimentos estruturais":
 - **Backend:** `Hugging Face Space (gratuito)`
-- **Space ID:** `rmayormartins/atelier-estetico-backend` (seu usuário + nome do Space)
+- **Space ID:** `rmayormartins/aiesthetic` (seu usuário + nome do Space)
 - Escolhe procedimento → Simular
 
 Pronto. Custo zero.
@@ -113,7 +113,7 @@ Pra evitar colar o ID toda vez nos testes, edita `index.html`:
 Para:
 
 ```html
-<input type="text" id="endpoint-url" placeholder="..." value="rmayormartins/atelier-estetico-backend">
+<input type="text" id="endpoint-url" placeholder="..." value="rmayormartins/aiesthetic">
 ```
 
 `git commit && git push` → atualiza no GitHub Pages.
